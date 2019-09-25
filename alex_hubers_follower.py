@@ -26,6 +26,7 @@ from geometry_msgs.msg import Twist
 
 # We use a hyperbolic tangent as a transfer function
 from math import tanh
+import math
 
 
 # This class will follow the nearest thing to it.
@@ -60,7 +61,7 @@ class Follower:
 		self.command.angular.z = 0.0
 
 	def laser_callback(self, scan):
-		# determines the closest thing to the Robit.
+		# determines the closest thing to the Robot.
 		self.get_position(scan)
 		rospy.logdebug('position: {0}'.format(self.position))
 
@@ -97,9 +98,12 @@ class Follower:
 	# function to occupy self.closest and self.position
 
 	def get_position(self, scan):
+		test = scan.ranges[int(math.floor(len(scan.ranges)*0.4)):]
+		# test = scan.ranges
 		# Build a depths array to rid ourselves of any nan data inherent in scan.ranges.
+		# print(scan.ranges)
 		depths = []
-		for dist in scan.ranges:
+		for dist in test:
 			if not np.isnan(dist):
 				depths.append(dist)
 		# scan.ranges is a tuple, and we want an array.
@@ -108,8 +112,8 @@ class Follower:
 		# If depths is empty that means we're way too close to an object to get a reading.
 		# thus establish our distance/position to nearest object as "0".
 		if len(depths) == 0:
-			self.closest = 0
-			self.position = 0
+			self.closest = self.stopDistance
+			self.position = 320
 		else:
 			self.closest = min(depths)
 			self.position = full_depths_array.index(self.closest)

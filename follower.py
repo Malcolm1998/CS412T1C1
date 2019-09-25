@@ -6,9 +6,9 @@ import smach_ros
 import math
 from math import tanh
 from geometry_msgs.msg import Twist
-from kobuki_msgs.msg import BumperEvent
 import numpy as np
 from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import Joy
 
 # rosrun joy joy_node
 class pid():
@@ -44,9 +44,11 @@ class Wait(smach.State):
         smach.State.__init__(self, outcomes=['start'])
 
     def execute(self, userdata):
-        rospy.loginfo('Executing state WAIT')
-        rospy.sleep(2)
-        return 'start'
+        global button_start
+        while True:
+            if button_start:
+                return 'start'
+            rospy.sleep(1)
 
 class Forward(smach.State):
 
@@ -55,7 +57,6 @@ class Forward(smach.State):
 
         # Subscribe to the laser data
         self.sub = rospy.Subscriber('scan', LaserScan, self.laser_callback)
-        self.bum_sub = rospy.Subscriber("bumper", BumperEvent, self.bumper_callback)
 
         # Publish movement commands to the turtlebot's base
         self.pub = rospy.Publisher('mobile_base/commands/velocity', Twist)
@@ -85,10 +86,12 @@ class Forward(smach.State):
         return
 
     def execute(self, userdata):
-        twist = Twist()
-        while self.hit == 0:
-            rospy.spin()
-        return 'finish'
+        global button_start
+        while True:
+            if not button_start:
+                button_start = False
+                return 'finish'
+            rospy.sleep(1)
 
     def laser_callback(self, scan):
         # determines the closest thing to the Robot.
@@ -107,6 +110,9 @@ class Forward(smach.State):
         rospy.logdebug('Distance: {0}, speed: {1}, angular: {2}'.format(self.closest, self.command.linear.x, self.command.angular.z))
         # Ensure we have only one publish command.
         self.pub.publish(self.command)
+
+    def controller_callback(self, event):
+        print(event)
 
 
     def bumper_callback(self, msg):
@@ -149,14 +155,19 @@ class Forward(smach.State):
             self.closest = min(depths)
             self.position = full_depths_array.index(self.closest)
 
+def controller_callback(event):
+    global button_start
+    if event.buttons[1] == 1:
+        button_start = not button_start
 
-# main
 def main():
+    global button_start
+    button_start = False
     rospy.init_node('cop_bot')
 
     global cmd_vel_pub
-    global sound_pub
     cmd_vel_pub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist, queue_size=1)
+    controller_sub = rospy.Subscriber('joy', Joy, controller_callback)
 
     sm_turtle = smach.StateMachine(outcomes=['WAIT'])
 
@@ -164,7 +175,7 @@ def main():
         smach.StateMachine.add('WAIT', Wait(),
                                transitions={'start': 'FORWARD'})
         smach.StateMachine.add('FORWARD', Forward(),
-                               transitions={'finish': 'WAIT'  })
+                               transitions={'finish': 'WAIT'})
 
     # Create and start the instrospection server - needed for smach_viewer
     sis = smach_ros.IntrospectionServer('TRAVELLER_server', sm_turtle, 'STATEMACHINE')

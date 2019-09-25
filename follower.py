@@ -8,9 +8,36 @@ from math import tanh
 from geometry_msgs.msg import Twist
 from kobuki_msgs.msg import BumperEvent
 import numpy as np
-import os
 from sensor_msgs.msg import LaserScan
 
+# rosrun joy joy_node
+class pid():
+    def __init__(self):
+        self.prevTime = rospy.time()
+        self.currentError = 0
+        self.previousError = 0
+        self.Kp = 0
+        self.Ki = 0
+        self.Kd = 0
+        return
+
+    def calcDerivative(currentError, previousError, deltaT):
+        return (currentError - previousError)/deltaT
+
+    def calcIntegral(currentError, deltaT):
+        return currentError*deltaT
+
+    def timeDifference(prevTime):
+        ans = rospy.time() - self.prevTime
+        self.prevTime = rospy.time()
+        return ans
+
+    def calcPID():
+        deltaT = timeDifference
+        part1 = Kp*self.currentError
+        part2 = Ki*calcIntegral(self.currentError, deltaT)
+        part3 = Kd*calcDerivative(self.currentError, self.previousError, deltaT)
+        ans = Kp*currentError + Ki*integral + Kd*derivative
 
 class Wait(smach.State):
     def __init__(self):

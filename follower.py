@@ -23,6 +23,29 @@ class Wait(smach.State):
 
 class Forward(smach.State):
 
+	def laser_callback(self, scan):
+		# determines the closest thing to the Robot.
+		self.get_position(scan)
+		rospy.logdebug('position: {0}'.format(self.position))
+
+		# if there's something within self.followDist from us, start following.
+		"""Also publishes to bark.py once it begins to follow. This is to get
+		the robot to begin barking as it follows the person.
+		"""
+		if self.closest < self.followDist:
+			# self.pubbark = rospy.Publisher('follow', String)
+			# self.pubbark.publish(String("Bark"))
+			self.follow()
+		# else just don't run at all.
+		else:
+			self.stop()
+
+			# Add a log message, so that we know what's going on
+		rospy.logdebug('Distance: {0}, speed: {1}, angular: {2}'.format(self.closest, self.command.linear.x, self.command.angular.z))
+		# Ensure we have only one publish command.
+		self.pub.publish(self.command)
+
+
     def __init__(self, outcomes=['stop'],follow_distance=2, stop_distance=1, max_speed=0.6, min_speed=0.01):
         # Subscribe to the laser data
         self.sub = rospy.Subscriber('scan', LaserScan, self.laser_callback)
@@ -120,6 +143,42 @@ class Forward(smach.State):
     def bumper_callback(self, msg):
         self.hit == msg.state
         rospy.loginfo("Bumper hit")
+
+	# Starts following the nearest object.
+	def follow(self):
+		self.command.linear.x = tanh(5 * (self.closest - self.stopDistance)) * self.max_speed
+		# turn faster the further we're turned from our intended object.
+		self.command.angular.z = ((self.position-320.0)/320.0)
+
+		# if we're going slower than our min_speed, just stop.
+		if abs(self.command.linear.x) < self.min_speed:
+			self.command.linear.x = 0.0
+
+	def stop(self):
+		self.command.linear.x = 0.0
+		self.command.angular.z = 0.0
+	# function to occupy self.closest and self.position
+
+	def get_position(self, scan):
+		test = scan.ranges[int(math.floor(len(scan.ranges)*0.4)):]
+		# test = scan.ranges
+		# Build a depths array to rid ourselves of any nan data inherent in scan.ranges.
+		# print(scan.ranges)
+		depths = []
+		for dist in test:
+			if not np.isnan(dist):
+				depths.append(dist)
+		# scan.ranges is a tuple, and we want an array.
+		full_depths_array = scan.ranges[:]
+
+		# If depths is empty that means we're way too close to an object to get a reading.
+		# thus establish our distance/position to nearest object as "0".
+		if len(depths) == 0:
+			self.closest = self.stopDistance
+			self.position = 320
+		else:
+			self.closest = min(depths)
+			self.position = full_depths_array.index(self.closest)
 
 
 # main

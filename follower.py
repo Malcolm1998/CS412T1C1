@@ -10,6 +10,8 @@ import numpy as np
 from sensor_msgs.msg import LaserScan
 from sensor_msgs.msg import Joy
 
+global button_start
+
 # rosrun joy joy_node
 class pid():
     def __init__(self):
@@ -91,9 +93,9 @@ class Forward(smach.State):
             if not button_start:
                 button_start = False
                 return 'finish'
-            rospy.sleep(1)
 
     def laser_callback(self, scan):
+        global button_start
         # determines the closest thing to the Robot.
         self.get_position(scan)
         rospy.logdebug('position: {0}'.format(self.position))
@@ -101,7 +103,8 @@ class Forward(smach.State):
         """Also publishes to bark.py once it begins to follow. This is to get
         the robot to begin barking as it follows the person.
         """
-        if self.closest < self.followDist:
+        rospy.loginfo("button_start: {}".format(button_start))
+        if self.closest < self.followDist and button_start:
             self.follow()
         # else just don't run at all.
         else:
@@ -165,8 +168,6 @@ def main():
     button_start = False
     rospy.init_node('cop_bot')
 
-    global cmd_vel_pub
-    cmd_vel_pub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist, queue_size=1)
     controller_sub = rospy.Subscriber('joy', Joy, controller_callback)
 
     sm_turtle = smach.StateMachine(outcomes=['WAIT'])

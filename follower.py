@@ -103,7 +103,7 @@ class Forward(smach.State):
         """Also publishes to bark.py once it begins to follow. This is to get
         the robot to begin barking as it follows the person.
         """
-        rospy.loginfo("button_start: {}".format(button_start))
+
         if self.closest < self.followDist and button_start:
             self.follow()
         # else just don't run at all.
@@ -126,7 +126,7 @@ class Forward(smach.State):
     def follow(self):
         self.command.linear.x = tanh(5 * (self.closest - self.stopDistance)) * self.max_speed
         # turn faster the further we're turned from our intended object.
-        self.command.angular.z = ((self.position-320.0)/320.0)
+        self.command.angular.z = ((self.position-320.0)/320.0)*2
 
         # if we're going slower than our min_speed, just stop.
         if abs(self.command.linear.x) < self.min_speed:
@@ -175,7 +175,7 @@ def main():
     with sm_turtle:
         smach.StateMachine.add('WAIT', Wait(),
                                transitions={'start': 'FORWARD'})
-        smach.StateMachine.add('FORWARD', Forward(),
+        smach.StateMachine.add('FORWARD', Forward(follow_distance=3),
                                transitions={'finish': 'WAIT'})
 
     # Create and start the instrospection server - needed for smach_viewer

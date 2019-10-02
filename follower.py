@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import signal
-import threading
 import rospy
 import smach
 import smach_ros
@@ -96,10 +95,6 @@ class Forward(smach.State):
 
     def controller_callback(self, event):
         print(event)
-
-    def bumper_callback(self, msg):
-        self.hit == msg.state
-        rospy.loginfo("Bumper hit")
 
     # Starts following the nearest object.
     def follow(self):

@@ -19,4 +19,4 @@ We built upon and converted alex_hubers_follower.py into a state machine
         2.`roslaunch turtlebot_bringup 3dsensor.launch`
     * If you want to run rviz along with the program, run `roslaunch turtlebot_rviz_launchers view_robot.launch`
     * If you want to run smach viewer along with the program, run `rosrun smach_viewer smach_viewer.py`
-6. `roslaunch cop_bot start.launch`
+6. `roslaunch cop_bot start.launch` Note: A controller(Logitech F710 for example) MUST be connected to the computer

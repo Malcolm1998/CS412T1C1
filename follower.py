@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import signal
+import threading
 import rospy
 import smach
 import smach_ros
@@ -11,51 +13,27 @@ from sensor_msgs.msg import LaserScan
 from sensor_msgs.msg import Joy
 
 global button_start
+global shutdown_requested
 
-# rosrun joy joy_node
-class pid():
-    def __init__(self):
-        self.prevTime = rospy.time()
-        self.currentError = 0
-        self.previousError = 0
-        self.Kp = 0
-        self.Ki = 0
-        self.Kd = 0
-        return
-
-    def calcDerivative(currentError, previousError, deltaT):
-        return (currentError - previousError)/deltaT
-
-    def calcIntegral(currentError, deltaT):
-        return currentError*deltaT
-
-    def timeDifference(prevTime):
-        ans = rospy.time() - self.prevTime
-        self.prevTime = rospy.time()
-        return ans
-
-    def calcPID():
-        deltaT = timeDifference
-        part1 = Kp*self.currentError
-        part2 = Ki*calcIntegral(self.currentError, deltaT)
-        part3 = Kd*calcDerivative(self.currentError, self.previousError, deltaT)
-        ans = Kp*currentError + Ki*integral + Kd*derivative
 
 class Wait(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['start'])
+        smach.State.__init__(self, outcomes=['start', 'done'])
 
     def execute(self, userdata):
         global button_start
-        while True:
+        global shutdown_requested
+        while not shutdown_requested:
             if button_start:
                 return 'start'
             rospy.sleep(1)
+        return 'done'
+
 
 class Forward(smach.State):
 
     def __init__(self, follow_distance=2, stop_distance=1, max_speed=0.6, min_speed=0.01):
-        smach.State.__init__(self, outcomes=['finish'])
+        smach.State.__init__(self, outcomes=['wait', 'done'])
 
         # Subscribe to the laser data
         self.sub = rospy.Subscriber('scan', LaserScan, self.laser_callback)
@@ -89,10 +67,12 @@ class Forward(smach.State):
 
     def execute(self, userdata):
         global button_start
-        while True:
+        global shutdown_requested
+        while not shutdown_requested:
             if not button_start:
                 button_start = False
-                return 'finish'
+                return 'wait'
+        return 'done'
 
     def laser_callback(self, scan):
         global button_start
@@ -117,7 +97,6 @@ class Forward(smach.State):
     def controller_callback(self, event):
         print(event)
 
-
     def bumper_callback(self, msg):
         self.hit == msg.state
         rospy.loginfo("Bumper hit")
@@ -138,12 +117,13 @@ class Forward(smach.State):
         # function to occupy self.closest and self.position
 
     def get_position(self, scan):
-        test = scan.ranges[int(math.floor(len(scan.ranges)*0.4)):]
-        # test = scan.ranges
+        # Use 60% of the left side scan data
+        scan_range = scan.ranges[int(math.floor(len(scan.ranges)*0.4)):]
+        # scan_range = scan.ranges
         # Build a depths array to rid ourselves of any nan data inherent in scan.ranges.
         # print(scan.ranges)
         depths = []
-        for dist in test:
+        for dist in scan_range:
             if not np.isnan(dist):
                 depths.append(dist)
                 # scan.ranges is a tuple, and we want an array.
@@ -158,34 +138,45 @@ class Forward(smach.State):
             self.closest = min(depths)
             self.position = full_depths_array.index(self.closest)
 
+
 def controller_callback(event):
     global button_start
     if event.buttons[1] == 1:
         button_start = not button_start
 
+
+def request_shutdown(sig, frame):
+    global shutdown_requested
+    shutdown_requested = True
+
+
 def main():
     global button_start
+    global shutdown_requested
     button_start = False
-    rospy.init_node('cop_bot')
+    shutdown_requested = False
 
+    rospy.init_node('cop_bot')
     controller_sub = rospy.Subscriber('joy', Joy, controller_callback)
 
-    sm_turtle = smach.StateMachine(outcomes=['WAIT'])
+    # Create done outcome which will stop the state machine
+    sm_turtle = smach.StateMachine(outcomes=['DONE'])
 
     with sm_turtle:
         smach.StateMachine.add('WAIT', Wait(),
-                               transitions={'start': 'FORWARD'})
+                               transitions={'start': 'FORWARD', 'done': 'DONE'})
         smach.StateMachine.add('FORWARD', Forward(follow_distance=3),
-                               transitions={'finish': 'WAIT'})
+                               transitions={'wait': 'WAIT', 'done': 'DONE'})
 
     # Create and start the instrospection server - needed for smach_viewer
     sis = smach_ros.IntrospectionServer('TRAVELLER_server', sm_turtle, 'STATEMACHINE')
     sis.start()
 
-    # Execute SMACH plan
-    outcome = sm_turtle.execute()
-    # wait for ctrl-c to stop the machine
-    rospy.spin()
+    # Start state machine and run until SIGINT received
+    signal.signal(signal.SIGINT, request_shutdown)
+    sm_turtle.execute()
+
+    # Stop server
     sis.stop()
 
 

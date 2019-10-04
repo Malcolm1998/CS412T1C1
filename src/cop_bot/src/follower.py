@@ -79,16 +79,13 @@ class Forward(smach.State):
         self.get_position(scan)
         rospy.logdebug('position: {0}'.format(self.position))
         # if there's something within self.followDist from us, start following.
-        """Also publishes to bark.py once it begins to follow. This is to get
-        the robot to begin barking as it follows the person.
-        """
 
         if self.closest < self.followDist and button_start:
             self.follow()
         # else just don't run at all.
         else:
             self.stop()
-            # Add a log message, so that we know what's going on
+        # Add a log message, so that we know what's going on
         rospy.logdebug('Distance: {0}, speed: {1}, angular: {2}'.format(self.closest, self.command.linear.x, self.command.angular.z))
         # Ensure we have only one publish command.
         self.pub.publish(self.command)
@@ -116,7 +113,6 @@ class Forward(smach.State):
         scan_range = scan.ranges[int(math.floor(len(scan.ranges)*0.4)):]
         # scan_range = scan.ranges
         # Build a depths array to rid ourselves of any nan data inherent in scan.ranges.
-        # print(scan.ranges)
         depths = []
         for dist in scan_range:
             if not np.isnan(dist):

@@ -164,7 +164,7 @@ def main():
                                transitions={'wait': 'WAIT', 'done': 'DONE'})
 
     # Create and start the instrospection server - needed for smach_viewer
-    sis = smach_ros.IntrospectionServer('TRAVELLER_server', sm_turtle, 'STATEMACHINE')
+    sis = smach_ros.IntrospectionServer('TRAVELLER_server', sm_turtle, 'FOLLOWER')
     sis.start()
 
     # Start state machine and run until SIGINT received
